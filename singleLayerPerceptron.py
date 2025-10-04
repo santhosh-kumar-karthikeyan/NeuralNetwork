@@ -1,6 +1,26 @@
 import pandas as pd
 import numpy as np
-from
+from Activation import binary, bipolar
+from typing import Any
+
+# Try to import tabulate for pretty tables; if unavailable, provide a small
+# callable fallback so static analyzers know `tabulate` is callable. At
+# runtime we still check `_HAS_TABULATE` to decide formatting.
+try:
+    from tabulate import tabulate  # type: ignore
+    _HAS_TABULATE = True
+except Exception:
+    def tabulate(rows: Any, headers: Any = None, tablefmt: str = "simple", stralign: str = "center") -> str:
+        # very small fallback that builds a compact header + row representation
+        out_lines = []
+        if headers:
+            out_lines.append(" | ".join(map(str, headers)))
+            out_lines.append("-" * max(10, len(out_lines[0])))
+        for r in rows:
+            out_lines.append(" | ".join(map(str, r)))
+        return "\n".join(out_lines)
+
+    _HAS_TABULATE = False
 class SingleLayerPerceptron:
     def __init__(self, df: pd.DataFrame, target: str,threshold: float, learning_rate: float = 0.1, init_weight : int = 0, max_epochs: int = 5):
         self.y = df[target]
@@ -16,23 +36,60 @@ class SingleLayerPerceptron:
         self.bias = 0
         target_levels = sorted(self.y.unique())
         if target_levels[0] < 0 and target_levels[-1] > 0:
-            self.activation = "bipolar"
+            self.activation = bipolar
         else:
-            self.activation = "binary"
+            self.activation = binary
         print(f"Inferred number of features: {len(self.weights)}")
         print(f"Inferred activation function: {self.activation}")
     
     def fit(self):
-        for inputs in self.X:
-            print(f"Inputs: {inputs} ")
-            print(f"Weights: {self.weights}")
-            print(f"Product: {inputs * self.weights}")
-            pros = inputs * self.weights
-            yin = pros.sum() + self.bias
-            print(f"Yin: {yin}")
+        convergence: bool = False
+        num_converged_features: int = 0
+        num_features = len(self.X[0])
+        num_epochs = self.__max_epochs
+        num_records = len(self.X)
+        epoch_iter = 1
+        input_headers = [f"x{i+1}" for i in range(num_features)]
+        delta_headers = [f"Δw{i+1}" for i in range(num_features)]
+        weight_headers = [f"w{i+1}" for i in range(num_features)]
+        headers = (
+            input_headers
+            + ["Net input", "Predicted"]
+            + delta_headers
+            + ["Δbias"]
+            + weight_headers
+            + ["bias"]
+        )
+        while not convergence and epoch_iter <= num_epochs:
+            print(f"EPOCH {epoch_iter}/{num_epochs}")
+            rows_epoch = []
+            for i, inputs in enumerate(self.X):
+                pros = inputs * self.weights
+                yin = pros.sum() + self.bias
+                y = self.activation(yin, self.__threshold)
+                # check convergence
+                if y == self.y[i]:
+                    num_converged_features += 1
+                # weight updation:
+                change_in_weights = self.__learning_rate * self.y[i] * inputs
+                self.weights += change_in_weights
+                new_weights_list = np.array(self.weights).tolist()
+                change_in_bias = self.__learning_rate * self.y[i]
+                self.bias += change_in_bias
+                inputs_list = inputs.tolist()
+                change_list = change_in_weights.tolist()
+
+                row = inputs_list + [yin, y] + change_list + [change_in_bias] + new_weights_list + [self.bias]
+
+                rows_epoch.append(row)
+            print(tabulate(rows_epoch, headers=headers, tablefmt="fancy_grid", stralign="center"))
+
+            epoch_iter += 1
+            convergence = num_converged_features == num_records
+            num_converged_features = 0
             
 if __name__ == "__main__":
-    data = pd.read_csv("2bitand.csv")
-    perceptron = SingleLayerPerceptron(data, "y", 0.1 , 0.1)
+    data = pd.read_csv("bipolar2bitand.csv")
+    perceptron = SingleLayerPerceptron(data, "y", threshold = 0 , learning_rate = 1, max_epochs = 5)
     perceptron.fit()
     
