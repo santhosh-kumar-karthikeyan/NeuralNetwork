@@ -4,9 +4,10 @@ from Activation import binary, bipolar
 from typing import Any
 from tabulate import tabulate
 from sklearn.metrics import classification_report
+from views.output import print_table
 
 class SingleLayerPerceptron:
-    def __init__(self, df: pd.DataFrame, target: str,threshold: float, learning_rate: float = 0.1, init_weight : int = 0, max_epochs: int = 5):
+    def __init__(self, df: pd.DataFrame, target: str, threshold: float, learning_rate: float = 0.1, init_weight: int = 0, max_epochs: int = 5):
         self.y = df[target]
         self.X = df[[feat for feat in df.columns if feat != target]].to_numpy()
         self.__init_weight = init_weight
@@ -14,9 +15,9 @@ class SingleLayerPerceptron:
         self.__threshold = threshold
         self.__learning_rate = learning_rate
         self.infer_metadata()
-        
+
     def infer_metadata(self):
-        self.weights = [ self.__init_weight ] * len(self.X[0])
+        self.weights = [self.__init_weight] * len(self.X[0])
         self.bias = 0
         target_levels = sorted(self.y.unique())
         if target_levels[0] < 0 and target_levels[-1] > 0:
@@ -25,7 +26,7 @@ class SingleLayerPerceptron:
             self.activation = binary
         print(f"Inferred number of features: {len(self.weights)}")
         print(f"Inferred activation function: {self.activation}")
-    
+
     def fit(self):
         convergence: bool = False
         num_converged_features: int = 0
@@ -67,7 +68,7 @@ class SingleLayerPerceptron:
                 row = inputs_list + [yin, y] + change_list + [change_in_bias] + new_weights_list + [self.bias]
 
                 rows_epoch.append(row)
-            print(tabulate(rows_epoch, headers=headers, tablefmt="simple", stralign="center"))
+            print_table(rows_epoch, headers)
 
             epoch_iter += 1
             convergence = num_converged_features == num_records
@@ -76,7 +77,7 @@ class SingleLayerPerceptron:
             print(num_converged_features)
             print("========================")
             num_converged_features = 0
-            
+
     def predict(self, X: np.ndarray):
         """Return predictions for rows in X (numpy array or list-of-lists).
         Uses the same activation and threshold as training.
@@ -92,9 +93,3 @@ class SingleLayerPerceptron:
         """
         preds = self.predict(X)
         return classification_report(y_true, preds)
-        
-if __name__ == "__main__":
-    data = pd.read_csv("bipolar2bitand.csv")
-    perceptron = SingleLayerPerceptron(data, "y", threshold = 0 , learning_rate = 1, max_epochs = 5)
-    perceptron.fit()
-    
