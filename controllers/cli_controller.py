@@ -7,7 +7,7 @@ import pickle
 import pandas as pd
 import numpy as np
 import argparse
-from models.perceptron import SingleLayerPerceptron
+from singleLayerPerceptron import SingleLayerPerceptron
 from utils.data_utils import load_csv
 
 MODEL_FILE = "model.pkl"

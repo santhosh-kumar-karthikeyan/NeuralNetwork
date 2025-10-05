@@ -71,10 +71,6 @@ class SingleLayerPerceptron:
 
             epoch_iter += 1
             convergence = num_converged_features == num_records
-            print("========================")
-            print("Number of converged features")
-            print(num_converged_features)
-            print("========================")
             num_converged_features = 0
             
     def predict(self, X: np.ndarray):
