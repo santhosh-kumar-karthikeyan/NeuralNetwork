@@ -1,7 +1,0 @@
-Activation
-cli
-controllers
-models
-singleLayerPerceptron
-utils
-views
