@@ -1,30 +1,49 @@
 import pandas as pd
 import numpy as np
-from Activation import binary, bipolar
-from typing import Any
+from Activation import binary, bipolar, sigmoid, threshold_fn
+from typing import Any, Callable
 from tabulate import tabulate
 from sklearn.metrics import classification_report
 
 class SingleLayerPerceptron:
-    def __init__(self, df: pd.DataFrame, target: str,threshold: float, learning_rate: float = 0.1, init_weight : int = 0, max_epochs: int = 5):
+    def __init__(self, df: pd.DataFrame, target: str, threshold: float, learning_rate: float = 0.1, init_weight: int = 0, max_epochs: int = 5, activation: str = "binary", verbose: bool = True):
         self.y = df[target]
         self.X = df[[feat for feat in df.columns if feat != target]].to_numpy()
         self.__init_weight = init_weight
         self.__max_epochs = max_epochs
         self.__threshold = threshold
         self.__learning_rate = learning_rate
+        self.__activation_name = activation
+        self.__verbose = verbose
         self.infer_metadata()
         
     def infer_metadata(self):
         self.weights = [ self.__init_weight ] * len(self.X[0])
         self.bias = 0
         target_levels = sorted(self.y.unique())
+        
+        # Infer target mode (bipolar or binary)
         if target_levels[0] < 0 and target_levels[-1] > 0:
-            self.activation = bipolar
+            self.target_mode = "bipolar"
         else:
-            self.activation = binary
-        print(f"Inferred number of features: {len(self.weights)}")
-        print(f"Inferred activation function: {self.activation}")
+            self.target_mode = "binary"
+        
+        # Store activation name for pickling
+        self.activation_func = self.__activation_name
+        
+        if self.__verbose:
+            print(f"Inferred number of features: {len(self.weights)}")
+            print(f"Inferred target mode: {self.target_mode}")
+            print(f"Selected activation function: {self.__activation_name}")
+    
+    def _apply_activation(self, x: float, t: float) -> float:
+        """Apply the selected activation function to input x with threshold t."""
+        if self.__activation_name == "sigmoid":
+            return sigmoid(x, self.target_mode)
+        elif self.__activation_name == "threshold":
+            return threshold_fn(x, t, self.target_mode)
+        else:  # binary or bipolar
+            return bipolar(x, t) if self.target_mode == "bipolar" else binary(x, t)
     
     def fit(self):
         convergence: bool = False
@@ -45,12 +64,13 @@ class SingleLayerPerceptron:
             + ["bias"]
         )
         while not convergence and epoch_iter <= num_epochs:
-            print(f"EPOCH {epoch_iter}/{num_epochs}")
+            if self.__verbose:
+                print(f"EPOCH {epoch_iter}/{num_epochs}")
             rows_epoch = []
             for i, inputs in enumerate(self.X):
                 pros = inputs * self.weights
                 yin = pros.sum() + self.bias
-                y = self.activation(yin, self.__threshold)
+                y = self._apply_activation(yin, self.__threshold)
                 # check convergence
                 if y == self.y[i]:
                     num_converged_features += 1
@@ -67,7 +87,12 @@ class SingleLayerPerceptron:
                 row = inputs_list + [yin, y] + change_list + [change_in_bias] + new_weights_list + [self.bias]
 
                 rows_epoch.append(row)
-            print(tabulate(rows_epoch, headers=headers, tablefmt="simple", stralign="center"))
+            if self.__verbose:
+                print(tabulate(rows_epoch, headers=headers, tablefmt="simple", stralign="center"))
+                print("=" * 80)
+            else:
+                # Log epoch completion even in silent mode (for evaluation with suppressed output)
+                print(f"[TRAIN] Epoch {epoch_iter}/{num_epochs} completed")
 
             epoch_iter += 1
             convergence = num_converged_features == num_records
@@ -80,7 +105,7 @@ class SingleLayerPerceptron:
         arr = np.array(X)
         pros = arr * self.weights
         yin = pros.sum(axis=1) + self.bias
-        preds = [self.activation(v, self.__threshold) for v in yin]
+        preds = [self._apply_activation(v, self.__threshold) for v in yin]
         return np.array(preds)
 
     def classification_report(self, X: np.ndarray, y_true: np.ndarray):

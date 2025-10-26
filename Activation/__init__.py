@@ -1,1 +1,1 @@
-from .activation import binary, bipolar
+from .activation import binary, bipolar, sigmoid, threshold_fn, step
